@@ -2,33 +2,48 @@ trigger:
 - main
 
 pool:
-  name: Default
-  demands:
-  - Agent.Name -equals dockeragent
+  name: dockeragent
 
 steps:
 
-- task: DockerInstaller@0
-  displayName: 'Docker Check'
-
-- script: |
+- powershell: |
+    Write-Host "Checking Docker Version..."
     docker version
   displayName: 'Verify Docker'
 
-- script: |
+- powershell: |
+    Write-Host "Building Docker Image..."
     docker build -t school-website:latest .
   displayName: 'Build Docker Image'
 
-- script: |
-    docker stop school-app
-    docker rm school-app
-  continueOnError: true
-  displayName: 'Remove Existing Container'
+- powershell: |
+    Write-Host "Stopping Existing Container..."
+    
+    $container = docker ps -aq -f "name=school-app"
 
-- script: |
-    docker run -d --name school-app -p 8080:80 school-website:latest
-  displayName: 'Run Container'
+    if ($container) {
+        docker stop school-app
+        docker rm school-app
+    }
 
-- script: |
+    Write-Host "Old Container Removed"
+  displayName: 'Remove Old Container'
+
+- powershell: |
+    Write-Host "Starting New Container..."
+
+    docker run -d `
+      --name school-app `
+      -p 8080:80 `
+      school-website:latest
+  displayName: 'Run Docker Container'
+
+- powershell: |
+    Write-Host "Running Containers"
     docker ps
   displayName: 'Verify Container'
+
+- powershell: |
+    Write-Host "Application URL:"
+    Write-Host "http://localhost:8080"
+  displayName: 'Display URL'
