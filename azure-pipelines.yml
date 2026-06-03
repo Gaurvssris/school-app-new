@@ -1,0 +1,34 @@
+trigger:
+- main
+
+pool:
+  name: Default
+  demands:
+  - Agent.Name -equals dockeragent
+
+steps:
+
+- task: DockerInstaller@0
+  displayName: 'Docker Check'
+
+- script: |
+    docker version
+  displayName: 'Verify Docker'
+
+- script: |
+    docker build -t school-website:latest .
+  displayName: 'Build Docker Image'
+
+- script: |
+    docker stop school-app
+    docker rm school-app
+  continueOnError: true
+  displayName: 'Remove Existing Container'
+
+- script: |
+    docker run -d --name school-app -p 8080:80 school-website:latest
+  displayName: 'Run Container'
+
+- script: |
+    docker ps
+  displayName: 'Verify Container'
