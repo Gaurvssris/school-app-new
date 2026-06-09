@@ -6,44 +6,71 @@ pool:
 
 steps:
 
-- powershell: |
-    Write-Host "Checking Docker Version..."
-    docker version
-  displayName: 'Verify Docker'
+# Terraform Init
+- task: TerraformTask@5
+  displayName: Terraform Init
+  inputs:
+    provider: 'azurerm'
+    command: 'init'
+    backendServiceArm: 'automation'
+    backendAzureRmStorageAccountName: 'gauravbackupstorage'
+    backendAzureRmContainerName: 'tfstate'
+    backendAzureRmKey: 'backup.tfstate'
 
-- powershell: |
-    Write-Host "Building Docker Image..."
-    docker build -t school-website:latest .
-  displayName: 'Build Docker Image'
+# Terraform Validate
+- task: TerraformTask@5
+  displayName: Terraform Validate
+  inputs:
+    provider: 'azurerm'
+    command: 'validate'
 
-- powershell: |
-    Write-Host "Stopping Existing Container..."
-    
-    $container = docker ps -aq -f "name=school-app"
+# Install TFLint
+- script: |
+    curl -s https://raw.githubusercontent.com/terraform-linters/tflint/master/install_linux.sh | bash
+    tflint --version
+  displayName: Install TFLint
 
-    if ($container) {
-        docker stop school-app
-        docker rm school-app
-    }
+# Run TFLint
+- script: |
+    tflint --init
+    tflint
+  displayName: Run TFLint
 
-    Write-Host "Old Container Removed"
-  displayName: 'Remove Old Container'
+# Install tfsec
+- script: |
+    curl -s https://raw.githubusercontent.com/aquasecurity/tfsec/master/scripts/install_linux.sh | bash
+    tfsec --version
+  displayName: Install tfsec
 
-- powershell: |
-    Write-Host "Starting New Container..."
+# Run tfsec
+- script: |
+    tfsec .
+  displayName: Run tfsec
 
-    docker run -d `
-      --name school-app `
-      -p 8080:80 `
-      school-website:latest
-  displayName: 'Run Docker Container'
+# Install Checkov
+- script: |
+    python3 -m pip install --upgrade pip
+    pip3 install checkov
+    checkov --version
+  displayName: Install Checkov
 
-- powershell: |
-    Write-Host "Running Containers"
-    docker ps
-  displayName: 'Verify Container'
+# Run Checkov
+- script: |
+    checkov -d .
+  displayName: Run Checkov
 
-- powershell: |
-    Write-Host "Application URL:"
-    Write-Host "http://localhost:8080"
-  displayName: 'Display URL'
+# Terraform Plan
+- task: TerraformTask@5
+  displayName: Terraform Plan
+  inputs:
+    provider: 'azurerm'
+    command: 'plan'
+    environmentServiceNameAzureRM: 'automation'
+
+# Terraform Apply
+- task: TerraformTask@5
+  displayName: Terraform Apply
+  inputs:
+    provider: 'azurerm'
+    command: 'apply'
+    environmentServiceNameAzureRM: 'automation'
